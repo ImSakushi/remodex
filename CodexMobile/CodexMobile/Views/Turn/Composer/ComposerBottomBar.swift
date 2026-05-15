@@ -95,11 +95,12 @@ struct ComposerBottomBar: View {
                     HapticFeedback.shared.triggerImpactFeedback(style: .light)
                     onResumeQueue()
                 } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(AppFont.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color(.systemBackground))
-                        .frame(width: 28, height: 28)
-                        .background(Color(.systemGray2), in: Circle())
+                    RemodexCircleBadge(
+                        systemName: "arrow.clockwise",
+                        foreground: Color(.systemBackground),
+                        background: Color(.systemGray2),
+                        diameter: 28
+                    )
                 }
                 .accessibilityLabel("Resume queued messages")
             }
@@ -124,11 +125,11 @@ struct ComposerBottomBar: View {
                     HapticFeedback.shared.triggerImpactFeedback()
                     onStopTurn(activeTurnID)
                 } label: {
-                    Image(systemName: "stop.fill")
-                        .font(AppFont.system(size: 12, weight: .bold))
-                        .foregroundStyle(sendButtonPaletteColor.bubbleForeground(for: colorScheme))
-                        .frame(width: 32, height: 32)
-                        .background(sendButtonPaletteColor.bubbleBackground(for: colorScheme), in: Circle())
+                    RemodexCircleBadge(
+                        systemName: "stop.fill",
+                        foreground: sendButtonPaletteColor.bubbleForeground(for: colorScheme),
+                        background: sendButtonPaletteColor.bubbleBackground(for: colorScheme)
+                    )
                 }
                 .accessibilityLabel("Stop current run")
             }
@@ -137,11 +138,11 @@ struct ComposerBottomBar: View {
                 HapticFeedback.shared.triggerImpactFeedback()
                 onSend()
             } label: {
-                Image(systemName: "arrow.up")
-                    .font(AppFont.system(size: 12, weight: .bold))
-                    .foregroundStyle(sendButtonIconColor)
-                    .frame(width: 32, height: 32)
-                    .background(sendButtonBackgroundColor, in: Circle())
+                RemodexCircleBadge(
+                    systemName: "arrow.up",
+                    foreground: sendButtonIconColor,
+                    background: sendButtonBackgroundColor
+                )
             }
             .overlay(alignment: .topTrailing) {
                 if queuedCount > 0 {
@@ -174,22 +175,37 @@ struct ComposerBottomBar: View {
     private var voiceButtonLabel: some View {
         Group {
             if voiceButtonPresentation.showsProgress {
-                ProgressView()
-                    .tint(voiceButtonPresentation.foregroundColor)
-                    .frame(width: 32, height: 32)
-                    .background(voiceButtonPresentation.backgroundColor, in: Circle())
+                CircularIconBadge(
+                    foreground: voiceButtonPresentation.foregroundColor,
+                    background: voiceButtonPresentation.backgroundColor
+                ) {
+                    ProgressView()
+                }
             } else if voiceButtonPresentation.hasCircleBackground {
-                Image(systemName: voiceButtonPresentation.systemImageName)
-                    .font(AppFont.system(size: 12, weight: .bold))
-                    .foregroundStyle(voiceButtonPresentation.foregroundColor)
-                    .frame(width: 32, height: 32)
-                    .background(voiceButtonPresentation.backgroundColor, in: Circle())
+                // Force the native SF Symbol via a raw `Image(systemName:)`
+                // (bypassing `RemodexIcon`'s custom asset mapping) so the
+                // mic/stop glyph inside the circle matches the surrounding
+                // send/stop buttons rather than the stylised central-* asset.
+                CircularIconBadge(
+                    foreground: voiceButtonPresentation.foregroundColor,
+                    background: voiceButtonPresentation.backgroundColor
+                ) {
+                    Image(systemName: voiceButtonPresentation.systemImageName)
+                        .font(.system(size: 17, weight: .regular))
+                }
             } else {
-                Image(systemName: voiceButtonPresentation.systemImageName)
-                    .font(metaTextFont)
-                    .foregroundStyle(metaLabelColor)
-                    .frame(width: plusTapTargetSide, height: plusTapTargetSide)
-                    .contentShape(Rectangle())
+                // Outline mic accanto a plus/flash. L'asset central-microphone
+                // ha un viewBox 24x24 con padding interno (glyph effettivo ~18pt),
+                // quindi anchorlo al font ambient lo fa apparire piccolo.
+                // Lo forziamo a riempire l'intero tap target così il glyph
+                // visibile combacia con il + plus / flash.
+                RemodexIcon.image(
+                    systemName: voiceButtonPresentation.systemImageName,
+                    size: plusTapTargetSide
+                )
+                .foregroundStyle(metaLabelColor)
+                .frame(width: plusTapTargetSide, height: plusTapTargetSide)
+                .contentShape(Rectangle())
             }
         }
     }
@@ -205,7 +221,7 @@ struct ComposerBottomBar: View {
                     onSetPlanModeArmed(newValue)
                 }
             )) {
-                Label("Plan mode", systemImage: "checklist")
+                RemodexIcon.label("Plan mode", systemName: "checklist")
             }
 
             if runtimeState.supportsFastMode {
@@ -213,7 +229,7 @@ struct ComposerBottomBar: View {
                     HapticFeedback.shared.triggerImpactFeedback(style: .light)
                     toggleFastMode()
                 } label: {
-                    Label("Fast Mode", systemImage: fastModePlusMenuIconName)
+                    RemodexIcon.label("Fast Mode", systemName: fastModePlusMenuIconName)
                 }
             }
 
@@ -231,7 +247,7 @@ struct ComposerBottomBar: View {
                 .disabled(remainingAttachmentSlots == 0)
             }
         } label: {
-            Image(systemName: "plus")
+            RemodexIcon.image(systemName: "plus")
                 .font(metaTextFont)
                 .fontWeight(.regular)
                 .frame(width: plusTapTargetSide, height: plusTapTargetSide)
@@ -244,7 +260,7 @@ struct ComposerBottomBar: View {
 
     private var planModeIndicator: some View {
         HStack(spacing: 5) {
-            Image(systemName: "checklist")
+            RemodexIcon.image(systemName: "checklist")
                 .font(metaSymbolFont)
             Text("Plan")
                 .font(metaTextFont)
@@ -273,7 +289,7 @@ struct ComposerBottomBar: View {
     private var queueBadge: some View {
         HStack(spacing: 3) {
             if isQueuePaused {
-                Image(systemName: "pause.fill")
+                RemodexIcon.image(systemName: "pause.fill")
                     .font(AppFont.system(size: 8, weight: .bold))
             }
             Text("\(queuedCount)")
@@ -387,7 +403,7 @@ private struct ComposerRuntimeMenuControl: View, Equatable {
     ) -> some View {
         HStack(spacing: 6) {
             if let leadingImageName {
-                Image(systemName: leadingImageName)
+                RemodexIcon.image(systemName: leadingImageName)
                     .font(metaSymbolFont)
                     .foregroundStyle(Color.primary)
             }
@@ -397,7 +413,7 @@ private struct ComposerRuntimeMenuControl: View, Equatable {
                 .fontWeight(.regular)
                 .lineLimit(1)
 
-            Image(systemName: "chevron.down")
+            RemodexIcon.image(systemName: "chevron.down")
                 .font(metaChevronFont)
                 .foregroundStyle(metaLabelColor)
         }
@@ -436,11 +452,11 @@ private struct AllModelsSheet: View {
                     ProgressView("Loading models…")
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if models.isEmpty {
-                    ContentUnavailableView(
-                        "No models available",
-                        systemImage: "square.stack.3d.up.slash",
-                        description: Text("Reconnect to your local Codex bridge to refresh the model list.")
-                    )
+                    ContentUnavailableView {
+                        RemodexIcon.label("No models available", systemName: "square.stack.3d.up.slash")
+                    } description: {
+                        Text("Reconnect to your local Codex bridge to refresh the model list.")
+                    }
                 } else {
                     List {
                         Section {
@@ -471,7 +487,7 @@ private struct AllModelsSheet: View {
     private func modelRow(for model: CodexModelOption) -> some View {
         let title = TurnComposerMetaMapper.modelTitle(for: model)
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: model.id == selectedModelID ? "checkmark.circle.fill" : "circle")
+            RemodexIcon.image(systemName: model.id == selectedModelID ? "checkmark.circle.fill" : "circle")
                 .font(.system(size: 18))
                 .foregroundStyle(model.id == selectedModelID ? Color.accentColor : Color(.tertiaryLabel))
                 .padding(.top, 2)
@@ -482,7 +498,7 @@ private struct AllModelsSheet: View {
                         .font(AppFont.body(weight: .medium))
                         .foregroundStyle(Color(.label))
                     if modelSupportsFastMode(model) {
-                        Image(systemName: CodexServiceTier.fast.iconName)
+                        RemodexIcon.image(systemName: CodexServiceTier.fast.iconName)
                             .font(AppFont.system(size: 11, weight: .regular))
                             .foregroundStyle(Color(.secondaryLabel))
                     }

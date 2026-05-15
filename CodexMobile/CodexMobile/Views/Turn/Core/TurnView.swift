@@ -8,6 +8,13 @@ import SwiftUI
 import PhotosUI
 import UIKit
 
+// The handoff and fork dialogs are mutually exclusive overlays that share the
+// same worktree creation surface.
+private enum TurnWorktreeOverlayRoute: Equatable {
+    case handoff
+    case fork
+}
+
 struct TurnView: View {
     let thread: CodexThread
     let isWakingMacDisplayRecovery: Bool
@@ -29,8 +36,7 @@ struct TurnView: View {
     @State private var alertApprovalRequest: CodexApprovalRequest?
     @State private var isApprovalAlertPresented = false
     @State private var isShowingMacHandoffConfirm = false
-    @State private var isShowingWorktreeHandoff = false
-    @State private var isShowingForkWorktree = false
+    @State private var worktreeOverlayRoute: TurnWorktreeOverlayRoute?
     @State private var macHandoffErrorMessage: String?
     @State private var isHandingOffToMac = false
     @State private var isStartingSiblingChat = false
@@ -232,13 +238,13 @@ struct TurnView: View {
                     .transition(.opacity)
             }
 
-            if isShowingWorktreeHandoff {
+            if worktreeOverlayRoute == .handoff {
                 TurnWorktreeHandoffOverlay(
                     mode: .handoff,
                     preferredBaseBranch: preferredWorktreeBaseBranch,
                     isHandoffAvailable: isWorktreeHandoffAvailable,
                     isSubmitting: viewModel.isCreatingGitWorktree,
-                    onClose: { isShowingWorktreeHandoff = false },
+                    onClose: { worktreeOverlayRoute = nil },
                     onSubmit: { branchName, baseBranch in
                         submitWorktreeHandoff(
                             branchName: branchName,
@@ -251,13 +257,13 @@ struct TurnView: View {
                 .transition(.opacity)
             }
 
-            if isShowingForkWorktree {
+            if worktreeOverlayRoute == .fork {
                 TurnWorktreeHandoffOverlay(
                     mode: .fork,
                     preferredBaseBranch: preferredWorktreeBaseBranch,
                     isHandoffAvailable: isWorktreeHandoffAvailable,
                     isSubmitting: viewModel.isCreatingGitWorktree || isForkingThread,
-                    onClose: { isShowingForkWorktree = false },
+                    onClose: { worktreeOverlayRoute = nil },
                     onSubmit: { branchName, baseBranch in
                         submitForkIntoNewWorktree(
                             branchName: branchName,
@@ -825,7 +831,7 @@ struct TurnView: View {
         }
 
         guard let associatedWorktreePath = codex.associatedManagedWorktreePath(for: thread.id) else {
-            isShowingWorktreeHandoff = true
+            worktreeOverlayRoute = .handoff
             return
         }
 
@@ -849,7 +855,7 @@ struct TurnView: View {
                         threadID: thread.id
                     )
                 case .missingAssociatedWorktree:
-                    isShowingWorktreeHandoff = true
+                    worktreeOverlayRoute = .handoff
                 }
             } catch {
                 viewModel.gitSyncAlert = TurnGitSyncAlert(
@@ -1035,7 +1041,7 @@ struct TurnView: View {
                         )
 
                         if case .moved(let move) = outcome {
-                            isShowingWorktreeHandoff = false
+                            worktreeOverlayRoute = nil
                             viewModel.refreshGitBranchTargets(
                                 codex: codex,
                                 workingDirectory: move.projectPath,
@@ -1127,7 +1133,7 @@ struct TurnView: View {
                             from: thread.id,
                             target: .projectPath(result.worktreePath)
                         )
-                        isShowingForkWorktree = false
+                        worktreeOverlayRoute = nil
                         openThread(forkedThread.id)
                     } catch {
                         viewModel.gitSyncAlert = TurnGitSyncAlert(
@@ -1375,7 +1381,7 @@ struct TurnView: View {
                 onStartCodeReviewThread: startCodeReviewThread,
                 onStartForkThreadLocally: startLocalFork,
                 onOpenForkWorktree: {
-                    isShowingForkWorktree = true
+                    worktreeOverlayRoute = .fork
                 },
                 onOpenWorktreeHandoff: {
                     handleWorktreeHandoffTap(currentThread: currentThread)

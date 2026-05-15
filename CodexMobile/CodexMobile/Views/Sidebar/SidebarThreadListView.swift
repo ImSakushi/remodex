@@ -14,7 +14,6 @@ struct SidebarThreadListView: View {
     let selectedThread: CodexThread?
     let bottomContentInset: CGFloat
     let timingLabelProvider: (CodexThread) -> String?
-    let diffTotalsByThreadID: [String: TurnSessionDiffTotals]
     let runBadgeStateByThreadID: [String: CodexThreadRunBadgeState]
     let onSelectThread: (CodexThread) -> Void
     let onCreateThreadInProjectGroup: (SidebarThreadGroup) -> Void
@@ -110,7 +109,7 @@ struct SidebarThreadListView: View {
                 }
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "pin")
+                    RemodexIcon.image(systemName: "pin")
                         .font(AppFont.body(weight: .medium))
                         .foregroundStyle(.primary)
                     Text(group.label)
@@ -118,7 +117,7 @@ struct SidebarThreadListView: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    RemodexIcon.image(systemName: "chevron.right")
                         .font(AppFont.caption(weight: .semibold))
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isPinnedExpanded ? 90 : 0))
@@ -142,7 +141,6 @@ struct SidebarThreadListView: View {
                         )
                     }
                 }
-                .padding(.leading, -8)
                 .padding(.bottom, 14)
                 .transition(.opacity)
             }
@@ -203,7 +201,7 @@ struct SidebarThreadListView: View {
                         CodexWorktreeIcon(pointSize: 16, weight: .medium)
                             .foregroundStyle(.primary)
                     } else {
-                        Image(systemName: group.iconSystemName)
+                        RemodexIcon.image(systemName: group.iconSystemName)
                             .font(AppFont.body(weight: .medium))
                             .foregroundStyle(.primary)
                     }
@@ -222,7 +220,7 @@ struct SidebarThreadListView: View {
                         HapticFeedback.shared.triggerImpactFeedback(style: .light)
                         onArchiveProjectGroup(group)
                     } label: {
-                        Label("Archive Project", systemImage: "archivebox")
+                        RemodexIcon.label("Archive Project", systemName: "archivebox")
                     }
                 }
 
@@ -237,7 +235,7 @@ struct SidebarThreadListView: View {
             }
 
             HStack(spacing: 8) {
-                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
+                RemodexIcon.image(systemName: isExpanded ? "chevron.down" : "chevron.right")
                     .font(AppFont.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .frame(width: 14, height: 14)
@@ -247,7 +245,7 @@ struct SidebarThreadListView: View {
                     HapticFeedback.shared.triggerImpactFeedback()
                     onCreateThreadInProjectGroup(group)
                 } label: {
-                    Image(systemName: "plus")
+                    RemodexIcon.image(systemName: "plus")
                         .font(AppFont.system(size: 12, weight: .semibold))
                         .foregroundStyle(.primary)
                         .frame(width: 30, height: 30)
@@ -271,7 +269,7 @@ struct SidebarThreadListView: View {
                 }
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: "archivebox")
+                    RemodexIcon.image(systemName: "archivebox")
                         .font(AppFont.body(weight: .medium))
                         .foregroundStyle(.primary)
                     Text(group.label)
@@ -279,7 +277,7 @@ struct SidebarThreadListView: View {
                         .foregroundStyle(.primary)
                         .lineLimit(1)
                     Spacer()
-                    Image(systemName: "chevron.right")
+                    RemodexIcon.image(systemName: "chevron.right")
                         .font(AppFont.caption(weight: .semibold))
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isArchivedExpanded ? 90 : 0))
@@ -359,7 +357,6 @@ struct SidebarThreadListView: View {
             isSelected: isSelected,
             runBadgeState: runBadgeStateByThreadID[thread.id],
             timingLabel: timingLabelProvider(thread),
-            diffTotals: diffTotalsByThreadID[thread.id],
             isPinned: codex.isThreadPinned(thread.id),
             pinnedProjectLabel: isPinnedRow ? thread.projectDisplayName : nil,
             childSubagentCount: childSubagentCount,

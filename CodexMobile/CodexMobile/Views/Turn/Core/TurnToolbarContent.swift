@@ -190,7 +190,7 @@ private struct ResizableThreadActionSymbol: View {
 
     private func resizedSymbol(named name: String, pointSize: CGFloat, weight: UIImage.SymbolWeight) -> UIImage {
         let config = UIImage.SymbolConfiguration(pointSize: pointSize, weight: weight)
-        guard let symbol = UIImage(systemName: name, withConfiguration: config)?
+        guard let symbol = RemodexIcon.uiImage(systemName: name, withConfiguration: config)?
             .withRenderingMode(.alwaysTemplate) else {
             return UIImage()
         }
@@ -242,7 +242,7 @@ struct TurnThreadPathSheet: View {
                                     HapticFeedback.shared.triggerImpactFeedback(style: .light)
                                     renamePrompt.present(currentTitle: threadTitle)
                                 } label: {
-                                    Image(systemName: "pencil")
+                                    RemodexIcon.image(systemName: "pencil")
                                         .font(AppFont.system(size: 14, weight: .semibold))
                                         .frame(width: 32, height: 32)
                                         .contentShape(Circle())
@@ -265,7 +265,7 @@ struct TurnThreadPathSheet: View {
                             } label: {
                                 Group {
                                     if didCopyPath {
-                                        Image(systemName: "checkmark")
+                                        RemodexIcon.image(systemName: "checkmark")
                                             .font(AppFont.system(size: 12, weight: .semibold))
                                     } else {
                                         Image("copy")

@@ -42,7 +42,7 @@ extension TurnGitActionKind {
 
     private static func resizedSymbol(named name: String, size: CGSize) -> UIImage {
         let config = UIImage.SymbolConfiguration(pointSize: size.height, weight: .regular)
-        guard let symbol = UIImage(systemName: name, withConfiguration: config)?.withRenderingMode(.alwaysTemplate) else {
+        guard let symbol = RemodexIcon.uiImage(systemName: name, withConfiguration: config)?.withRenderingMode(.alwaysTemplate) else {
             return UIImage()
         }
         let renderer = UIGraphicsImageRenderer(size: size)
@@ -342,7 +342,7 @@ private struct UIKitGitActionsMenuButton: UIViewRepresentable {
         private func makePlaceholderChangesRow(title: String, systemImage: String) -> UIAction {
             return UIAction(
                 title: title,
-                image: UIImage(systemName: systemImage),
+                image: RemodexIcon.uiImage(systemName: systemImage),
                 attributes: .disabled,
                 handler: { _ in }
             )
@@ -355,7 +355,7 @@ private struct UIKitGitActionsMenuButton: UIViewRepresentable {
             // presentation. NOT related to totals loading.
             let action = UIAction(
                 title: plainChangesTitle(totals: totals),
-                image: UIImage(systemName: "doc.text.magnifyingglass"),
+                image: RemodexIcon.uiImage(systemName: "doc.text.magnifyingglass"),
                 attributes: snapshot.isLoadingRepoDiff ? .disabled : []
             ) { _ in
                 HapticFeedback.shared.triggerImpactFeedback(style: .light)

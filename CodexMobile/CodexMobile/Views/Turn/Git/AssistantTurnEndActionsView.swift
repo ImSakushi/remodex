@@ -97,7 +97,7 @@ struct AssistantTurnEndActionsView: View {
             assistantRevertAction?(targetMessage)
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: iconName)
+                RemodexIcon.image(systemName: iconName)
                     .font(AppFont.system(size: 10, weight: .medium))
                     .foregroundStyle(accentColor)
                 Text(presentation.title)

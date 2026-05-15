@@ -526,7 +526,7 @@ extension CodexService {
 
     // Runs the post-connect sync work that is useful but not required to mark the socket usable.
     func performPostConnectSyncPass(preferredThreadId: String? = nil) async {
-        // Paint recent chats first; the uncapped sidebar pass runs after the shell is usable.
+        // Paint recent chats first; a capped sidebar refresh runs after the shell is usable.
         await syncThreadsList()
         scheduleRuntimeOptionRefresh()
         if await routePendingNotificationOpenIfPossible(refreshIfNeeded: false) {
@@ -564,7 +564,7 @@ extension CodexService {
         scheduleCompleteThreadListHydration()
     }
 
-    // Finishes full sidebar metadata without keeping initial reconnect in the loading state.
+    // Refreshes capped sidebar metadata without keeping initial reconnect in the loading state.
     private func scheduleCompleteThreadListHydration() {
         Task { @MainActor [weak self] in
             guard let self, self.isConnected, self.isInitialized, !self.isLoadingThreads else {

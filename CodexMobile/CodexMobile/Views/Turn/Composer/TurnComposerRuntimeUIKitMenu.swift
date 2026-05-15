@@ -85,7 +85,7 @@ enum TurnComposerRuntimeUIKitMenuBuilder {
                 items.append(
                     UIAction(
                         title: "Other models…",
-                        image: UIImage(systemName: "ellipsis")
+                        image: RemodexIcon.uiImage(systemName: "ellipsis")
                     ) { _ in
                         HapticFeedback.shared.triggerImpactFeedback(style: .light)
                         input.onRequestAllModelsSheet()
@@ -99,7 +99,7 @@ enum TurnComposerRuntimeUIKitMenuBuilder {
         return UIMenu(
             title: "Model",
             subtitle: subtitle,
-            image: UIImage(systemName: "cube"),
+            image: RemodexIcon.uiImage(systemName: "cube"),
             options: [.singleSelection],
             children: modelChildren
         )
@@ -108,7 +108,7 @@ enum TurnComposerRuntimeUIKitMenuBuilder {
     private static func modelAction(model: CodexModelOption, input: Input) -> UIAction {
         let title = TurnComposerMetaMapper.modelTitle(for: model)
         let image: UIImage? = model.supportsServiceTier(.fast)
-            ? UIImage(systemName: CodexServiceTier.fast.iconName)
+            ? RemodexIcon.uiImage(systemName: CodexServiceTier.fast.iconName)
             : nil
 
         return UIAction(
@@ -165,7 +165,7 @@ enum TurnComposerRuntimeUIKitMenuBuilder {
         return UIMenu(
             title: "Intelligence",
             subtitle: input.runtimeState.selectedReasoningTitle,
-            image: UIImage(systemName: "brain"),
+            image: RemodexIcon.uiImage(systemName: "brain"),
             options: [.singleSelection],
             children: actions
         )
@@ -187,7 +187,7 @@ enum TurnComposerRuntimeUIKitMenuBuilder {
         let tierActions: [UIMenuElement] = CodexServiceTier.allCases.map { tier in
             UIAction(
                 title: tier.displayName,
-                image: UIImage(systemName: tier.iconName),
+                image: RemodexIcon.uiImage(systemName: tier.iconName),
                 state: input.runtimeState.isSelectedServiceTier(tier) ? .on : .off
             ) { _ in
                 HapticFeedback.shared.triggerImpactFeedback(style: .light)
@@ -205,7 +205,7 @@ enum TurnComposerRuntimeUIKitMenuBuilder {
         return UIMenu(
             title: "Speed",
             subtitle: subtitle,
-            image: UIImage(systemName: "bolt.fill"),
+            image: RemodexIcon.uiImage(systemName: "bolt.fill"),
             options: [.singleSelection],
             children: [normalAction] + tierActions
         )

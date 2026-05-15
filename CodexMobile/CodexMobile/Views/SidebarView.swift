@@ -1,14 +1,17 @@
 // FILE: SidebarView.swift
 // Purpose: Orchestrates the sidebar experience with modular presentation components.
+//          Top: brand toolbar + search field + Remodex title block + connection chip.
+//          Body: project / chat list. Bottom: SidebarBottomActionBar with the
+//          primary Chat FAB (glass on iOS 26, accent pill on iOS 18).
 // Layer: View
 // Exports: SidebarView
-// Depends on: CodexService, Sidebar* components/helpers
+// Depends on: CodexService, SidebarHeaderView, SidebarTitleBlock,
+//             SidebarThreadListView, SidebarBottomActionBar, SidebarSearchField
 
 import SwiftUI
 
 struct SidebarView: View {
     @Environment(CodexService.self) private var codex
-    @Environment(\.colorScheme) private var colorScheme
 
     @Binding var selectedThread: CodexThread?
     @Binding var showSettings: Bool
@@ -30,36 +33,32 @@ struct SidebarView: View {
     @State private var projectGroupPendingDeletion: SidebarThreadGroup? = nil
     @State private var threadPendingDeletion: CodexThread? = nil
     @State private var createThreadErrorMessage: String? = nil
-    @State private var cachedDiffTotals: [String: TurnSessionDiffTotals] = [:]
-    @State private var cachedDiffRevisionByThreadID: [String: Int] = [:]
     @State private var cachedRunBadges: [String: CodexThreadRunBadgeState] = [:]
     @State private var lastGroupedThreadsFingerprint: Int = 0
-    @State private var lastDiffFingerprint: Int = 0
     @State private var lastBadgeFingerprint: Int = 0
 
     var body: some View {
-        let diffTotalsByThreadID = cachedDiffTotals
-
         VStack(alignment: .leading, spacing: 0) {
             SidebarHeaderView(
                 showsCloseButton: showsInlineCloseButton,
-                onClose: onClose
+                onClose: onClose,
+                overflowActions: overflowMenuActions
             )
 
-            SidebarSearchField(text: $searchText, isActive: $isSearchActive)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 6)
-
-            SidebarTopActionsRow(
-                isEnabled: canCreateThread,
-                pendingAction: pendingTopAction,
-                onNewChat: handleNewChatButtonTap,
-                onQuickChat: handleQuickChatTap,
-                onNewProject: handleNewProjectTap
+            SidebarTitleBlock(
+                computerName: codex.trustedPairPresentation?.name,
+                isConnected: codex.isConnected
             )
             .padding(.horizontal, 16)
+            .padding(.top, 8)
             .padding(.bottom, 10)
+
+            // Sits under the Remodex title + computer chip. Keep it above the
+            // list (not inside `safeAreaBar`) so `@FocusState` flips reliably
+            // and the trailing X dismiss button appears on focus.
+            SidebarSearchField(text: $searchText, isActive: $isSearchActive)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
 
             if SidebarThreadsLoadingPresentation.shouldShowInlineStatus(
                 isLoadingThreads: codex.isLoadingThreads,
@@ -71,70 +70,7 @@ struct SidebarView: View {
                     .transition(.opacity)
             }
 
-            SidebarThreadListView(
-                isFiltering: !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                isConnected: codex.isConnected,
-                isCreatingThread: isCreatingThread,
-                threads: codex.threads,
-                groups: groupedThreads,
-                selectedThread: selectedThread,
-                bottomContentInset: 0,
-                timingLabelProvider: { SidebarRelativeTimeFormatter.compactLabel(for: $0) },
-                diffTotalsByThreadID: diffTotalsByThreadID,
-                runBadgeStateByThreadID: cachedRunBadges,
-                onSelectThread: selectThread,
-                onCreateThreadInProjectGroup: { group in
-                    handleNewChatTap(preferredProjectPath: group.projectPath)
-                },
-                onArchiveProjectGroup: { group in
-                    projectGroupPendingArchive = group
-                },
-                onDeleteProjectGroup: { group in
-                    projectGroupPendingDeletion = group
-                },
-                onRenameThread: { thread, newName in
-                    codex.renameThread(thread.id, name: newName)
-                },
-                onPinToggleThread: { thread in
-                    if codex.isThreadPinned(thread.id) {
-                        codex.unpinThread(thread.id)
-                    } else {
-                        codex.pinThread(thread.id)
-                    }
-                    rebuildGroupedThreads()
-                },
-                onArchiveToggleThread: { thread in
-                    if thread.syncState == .archivedLocal {
-                        codex.unarchiveThread(thread.id)
-                    } else {
-                        codex.archiveThread(thread.id)
-                        if selectedThread?.id == thread.id {
-                            selectedThread = nil
-                        }
-                    }
-                },
-                onDeleteThread: { thread in
-                    threadPendingDeletion = thread
-                }
-            )
-            .refreshable {
-                await refreshThreads()
-            }
-
-            HStack(spacing: 10) {
-                SidebarFloatingTerminalButton(colorScheme: colorScheme, action: openTerminal)
-                SidebarFloatingSettingsButton(colorScheme: colorScheme, action: openSettings)
-                Spacer(minLength: 0)
-                if let trustedPairPresentation = codex.trustedPairPresentation {
-                    SidebarComputerConnectionStatusView(
-                        name: trustedPairPresentation.name,
-                        systemName: trustedPairPresentation.systemName,
-                        isConnected: codex.isConnected
-                    )
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
+            threadListWithBottomBar
         }
         .frame(maxHeight: .infinity)
         .background(Color(.systemBackground))
@@ -162,13 +98,14 @@ struct SidebarView: View {
             debugSidebarLog("pinned threads changed count=\(codex.pinnedThreadIDs.count)")
             rebuildGroupedThreads()
         }
-        .onChange(of: diffFingerprint) { _, _ in
-            debugSidebarLog("diff fingerprint changed visible=\(isVisible)")
-            rebuildCachedDiffTotals()
-        }
+        // Deferred to the next runloop tick so rebuilding the cache `@State`
+        // does not trigger another body re-evaluation inside the same frame
+        // (which previously cascaded with iOS 26 `safeAreaBar`'s internal
+        // OnScrollGeometryChange and logged "tried to update multiple times
+        // per frame" warnings).
         .onChange(of: badgeFingerprint) { _, _ in
             debugSidebarLog("badge fingerprint changed visible=\(isVisible)")
-            rebuildCachedRunBadges()
+            Task { @MainActor in rebuildCachedRunBadges() }
         }
         .onChange(of: isVisible) { _, visible in
             debugSidebarLog("visibility changed visible=\(visible)")
@@ -453,21 +390,6 @@ struct SidebarView: View {
         return hasher.finalize()
     }
 
-    // Cheap fingerprint: hashes thread IDs + message revisions (O(n) integer work, no message access).
-    private var diffFingerprint: Int {
-        var hasher = Hasher()
-        let hasRunningTurn = codex.hasAnyRunningTurn
-        hasher.combine(hasRunningTurn)
-        guard !hasRunningTurn else {
-            return hasher.finalize()
-        }
-        for thread in codex.threads {
-            hasher.combine(thread.id)
-            hasher.combine(codex.messageRevision(for: thread.id))
-        }
-        return hasher.finalize()
-    }
-
     // Cheap fingerprint for run badge state — changes when running/ready/failed sets change.
     private var badgeFingerprint: Int {
         var hasher = Hasher()
@@ -482,43 +404,10 @@ struct SidebarView: View {
 
     private func rebuildCachedSidebarState() {
         let startedAt = Date()
-        rebuildCachedDiffTotals()
         rebuildCachedRunBadges()
         debugSidebarLog(
             "rebuildCachedSidebarState durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1000)) "
-                + "diffTotals=\(cachedDiffTotals.count) runBadges=\(cachedRunBadges.count)"
-        )
-    }
-
-    private func rebuildCachedDiffTotals() {
-        let fp = diffFingerprint
-        guard fp != lastDiffFingerprint else { return }
-        // Keep streaming smooth: diff totals are sidebar-only and can wait until active runs settle.
-        guard !codex.hasAnyRunningTurn else {
-            debugSidebarLog("rebuildCachedDiffTotals skipped runningTurn=true")
-            return
-        }
-        let startedAt = Date()
-        lastDiffFingerprint = fp
-
-        let currentThreadIDs = Set(codex.threads.map(\.id))
-        cachedDiffTotals = cachedDiffTotals.filter { currentThreadIDs.contains($0.key) }
-        cachedDiffRevisionByThreadID = cachedDiffRevisionByThreadID.filter { currentThreadIDs.contains($0.key) }
-
-        for thread in codex.threads {
-            let revision = codex.messageRevision(for: thread.id)
-            guard cachedDiffRevisionByThreadID[thread.id] != revision else { continue }
-
-            let messages = codex.messages(for: thread.id)
-            cachedDiffTotals[thread.id] = TurnSessionDiffSummaryCalculator.totals(
-                from: messages,
-                scope: .unpushedSession
-            )
-            cachedDiffRevisionByThreadID[thread.id] = revision
-        }
-        debugSidebarLog(
-            "rebuildCachedDiffTotals durationMs=\(Int(Date().timeIntervalSince(startedAt) * 1000)) "
-                + "threadCount=\(codex.threads.count) cached=\(cachedDiffTotals.count)"
+                + "runBadges=\(cachedRunBadges.count)"
         )
     }
 
@@ -548,6 +437,89 @@ struct SidebarView: View {
 
     private var canCreateThread: Bool {
         codex.isConnected && codex.isInitialized
+    }
+
+    // Wraps the thread list with the bottom action bar. `safeAreaInset` keeps
+    // the glass controls in the hit-test tree; `safeAreaBar` could render the
+    // iOS 26 bar while dropping taps from the Terminal pill inside the drawer.
+    @ViewBuilder
+    private var threadListWithBottomBar: some View {
+        threadList
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                bottomActionBar
+            }
+    }
+
+    private var threadList: some View {
+        SidebarThreadListView(
+            isFiltering: !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            isConnected: codex.isConnected,
+            isCreatingThread: isCreatingThread,
+            threads: codex.threads,
+            groups: groupedThreads,
+            selectedThread: selectedThread,
+            bottomContentInset: 0,
+            timingLabelProvider: { SidebarRelativeTimeFormatter.compactLabel(for: $0) },
+            runBadgeStateByThreadID: cachedRunBadges,
+            onSelectThread: selectThread,
+            onCreateThreadInProjectGroup: { group in
+                handleNewChatTap(preferredProjectPath: group.projectPath)
+            },
+            onArchiveProjectGroup: { group in
+                projectGroupPendingArchive = group
+            },
+            onDeleteProjectGroup: { group in
+                projectGroupPendingDeletion = group
+            },
+            onRenameThread: { thread, newName in
+                codex.renameThread(thread.id, name: newName)
+            },
+            onPinToggleThread: { thread in
+                if codex.isThreadPinned(thread.id) {
+                    codex.unpinThread(thread.id)
+                } else {
+                    codex.pinThread(thread.id)
+                }
+                rebuildGroupedThreads()
+            },
+            onArchiveToggleThread: { thread in
+                if thread.syncState == .archivedLocal {
+                    codex.unarchiveThread(thread.id)
+                } else {
+                    codex.archiveThread(thread.id)
+                    if selectedThread?.id == thread.id {
+                        selectedThread = nil
+                    }
+                }
+            },
+            onDeleteThread: { thread in
+                threadPendingDeletion = thread
+            }
+        )
+        .refreshable {
+            await refreshThreads()
+        }
+    }
+
+    private var bottomActionBar: some View {
+        SidebarBottomActionBar(
+            isChatEnabled: canCreateThread,
+            isCreatingThread: isCreatingThread,
+            onTapChat: handleNewChatButtonTap,
+            onTapTerminal: openTerminal
+        )
+    }
+
+    private var overflowMenuActions: SidebarOverflowMenuActions {
+        SidebarOverflowMenuActions(
+            isEnabled: canCreateThread,
+            pendingAction: pendingTopAction,
+            onNewChat: handleNewChatButtonTap,
+            onQuickChat: handleQuickChatTap,
+            onNewProject: handleNewProjectTap,
+            onOpenTerminal: openTerminal,
+            onOpenSettings: openSettings
+        )
     }
 
     // Sidebar refresh and search events can fire during gestures; logs must not mutate view state.

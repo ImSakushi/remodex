@@ -61,7 +61,7 @@ enum TurnComposerSlashCommand: String, Identifiable, Codable, Equatable, Sendabl
         case .feedback:
             return "envelope"
         case .fork:
-            return "arrow.triangle.branch"
+            return "remodex.fork"
         case .status:
             return "speedometer"
         case .subagents:

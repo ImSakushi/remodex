@@ -174,37 +174,39 @@ struct TurnComposerHostView: View {
             onStopTurn: { turnID in
                 viewModel.interruptTurn(turnID, codex: codex, threadID: thread.id)
             },
-            onInputChangedForFileAutocomplete: { text in
-                viewModel.onInputChangedForFileAutocomplete(
-                    text,
-                    codex: codex,
-                    thread: thread,
-                    activeTurnID: activeTurnID
-                )
-            },
-            onInputChangedForSkillAutocomplete: { text in
-                viewModel.onInputChangedForSkillAutocomplete(
-                    text,
-                    codex: codex,
-                    thread: thread,
-                    activeTurnID: activeTurnID
-                )
-            },
-            onInputChangedForPluginAutocomplete: { text in
-                viewModel.onInputChangedForPluginAutocomplete(
-                    text,
-                    codex: codex,
-                    thread: thread,
-                    activeTurnID: activeTurnID
-                )
-            },
-            onInputChangedForSlashCommandAutocomplete: { text in
-                viewModel.onInputChangedForSlashCommandAutocomplete(
-                    text,
-                    activeTurnID: activeTurnID
-                )
-                viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
-            },
+            onInputChanged: TurnComposerInputChangeHandler(
+                handleFileAutocomplete: { text in
+                    viewModel.onInputChangedForFileAutocomplete(
+                        text,
+                        codex: codex,
+                        thread: thread,
+                        activeTurnID: activeTurnID
+                    )
+                },
+                handleSkillAutocomplete: { text in
+                    viewModel.onInputChangedForSkillAutocomplete(
+                        text,
+                        codex: codex,
+                        thread: thread,
+                        activeTurnID: activeTurnID
+                    )
+                },
+                handlePluginAutocomplete: { text in
+                    viewModel.onInputChangedForPluginAutocomplete(
+                        text,
+                        codex: codex,
+                        thread: thread,
+                        activeTurnID: activeTurnID
+                    )
+                },
+                handleSlashCommandAutocomplete: { text in
+                    viewModel.onInputChangedForSlashCommandAutocomplete(
+                        text,
+                        activeTurnID: activeTurnID
+                    )
+                    viewModel.saveLocalDraft(codex: codex, threadID: thread.id)
+                }
+            ),
             onSelectFileAutocomplete: { item in
                 viewModel.onSelectFileAutocomplete(item)
                 viewModel.saveLocalDraft(codex: codex, threadID: thread.id)

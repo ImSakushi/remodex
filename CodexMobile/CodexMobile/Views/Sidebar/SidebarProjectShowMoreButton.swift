@@ -23,7 +23,7 @@ struct SidebarProjectShowMoreButton: View {
             } label: {
                 HStack(spacing: 6) {
                     Text(hiddenCount > 0 ? "Show \(hiddenCount) more" : "Show more")
-                    Image(systemName: "chevron.down")
+                    RemodexIcon.image(systemName: "chevron.down")
                         .font(AppFont.system(size: 10, weight: .semibold))
                         .rotationEffect(.degrees(chevronRotated ? 180 : 0))
                 }

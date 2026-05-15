@@ -16,7 +16,7 @@ private enum ThreadListHydrationPolicy {
 }
 
 extension CodexService {
-    // Polling keeps recent metadata fresh; full list loads are reserved for bootstrap/explicit refresh.
+    // Sidebar loads stay capped so reconnect/bootstrap cannot pull an entire local history at once.
     var recentActiveThreadListLimit: Int { 70 }
     var recentArchivedThreadListLimit: Int { 10 }
 
@@ -86,10 +86,13 @@ extension CodexService {
         isLoadingThreads = true
         defer { isLoadingThreads = false }
 
-        // Sidebar metadata must be complete, but each active page can paint as it arrives.
-        async let archivedThreadsFetch = fetchServerThreads(limit: limit, archived: true)
+        let activeLimit = limit ?? recentActiveThreadListLimit
+        let archivedLimit = limit ?? recentArchivedThreadListLimit
 
-        let activeThreads = try await fetchServerThreads(limit: limit) { _, accumulatedThreads in
+        // Sidebar metadata paints as active chats arrive, while archived sync stays a small side fetch.
+        async let archivedThreadsFetch = fetchServerThreads(limit: archivedLimit, archived: true)
+
+        let activeThreads = try await fetchServerThreads(limit: activeLimit) { _, accumulatedThreads in
             self.reconcileLocalThreadsWithServer(accumulatedThreads)
 
             if self.activeThreadId == nil {

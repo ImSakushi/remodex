@@ -157,7 +157,7 @@ struct FileChangeSummaryBox: View {
                     HapticFeedback.shared.triggerImpactFeedback(style: .light)
                     isShowingAllChangesDiff = true
                 } label: {
-                    Image(systemName: "arrow.up.right")
+                    RemodexIcon.image(systemName: "arrow.up.right")
                         .font(AppFont.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .frame(width: 24, height: 24)
@@ -173,7 +173,7 @@ struct FileChangeSummaryBox: View {
                         isExpanded.toggle()
                     }
                 } label: {
-                    Image(systemName: "chevron.down")
+                    RemodexIcon.image(systemName: "chevron.down")
                         .font(AppFont.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isExpanded ? 0 : -90))

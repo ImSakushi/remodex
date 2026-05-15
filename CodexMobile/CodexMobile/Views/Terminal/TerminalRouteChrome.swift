@@ -19,7 +19,7 @@ struct TerminalGlassBackButton: View {
             HapticFeedback.shared.triggerImpactFeedback(style: .light)
             action()
         } label: {
-            Image(systemName: "chevron.backward")
+            RemodexIcon.image(systemName: "chevron.backward")
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(Color(hexString: theme.foreground))
                 .frame(width: 36, height: 36)
@@ -157,7 +157,7 @@ private struct TerminalArmedModifierBadge: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            Image(systemName: modifier.menuSymbolName)
+            RemodexIcon.image(systemName: modifier.menuSymbolName)
                 .font(.system(size: 9, weight: .bold))
             Text("\(modifier.menuTitle.uppercased()) armed")
                 .font(.system(size: 10, weight: .semibold, design: .monospaced))
@@ -268,7 +268,7 @@ private struct TerminalRouteKeySegment: View {
                 label: Text("Modifier key")
             ) {
                 ForEach(TerminalPendingModifier.allCases, id: \.self) { modifier in
-                    Label(modifier.menuTitle, systemImage: modifier.menuSymbolName)
+                    RemodexIcon.label(modifier.menuTitle, systemName: modifier.menuSymbolName)
                         .tag(modifier)
                 }
             }
@@ -304,7 +304,7 @@ private struct TerminalRouteKeySegment: View {
                 .font(.system(size: 12, weight: .semibold, design: .monospaced))
                 .foregroundStyle(textColor)
             if action.isModifier {
-                Image(systemName: "chevron.up.chevron.down")
+                RemodexIcon.image(systemName: "chevron.up.chevron.down")
                     .font(.system(size: 7, weight: .bold))
                     .foregroundStyle(textColor.opacity(0.75))
             }
@@ -345,7 +345,7 @@ private struct TerminalRouteCircleAction: View {
             HapticFeedback.shared.triggerImpactFeedback(style: .light)
             action()
         } label: {
-            Image(systemName: systemImage)
+            RemodexIcon.image(systemName: systemImage)
                 .font(.system(size: 15, weight: .semibold))
                 .foregroundStyle(iconColor)
                 .frame(width: 40, height: 40)
@@ -579,7 +579,7 @@ private struct DPadArrows: View {
                 .fill(activeDirection == direction ? accent.opacity(0.72) : Color.white.opacity(0.08))
                 .frame(width: 16, height: 16)
 
-            Image(systemName: direction.symbolName)
+            RemodexIcon.image(systemName: direction.symbolName)
                 .foregroundStyle(activeDirection == direction ? activeForeground : foreground.opacity(0.82))
         }
     }
@@ -595,7 +595,7 @@ struct TerminalRouteUnavailableView: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "terminal")
+            RemodexIcon.image(systemName: "terminal")
                 .font(.system(size: 28, weight: .semibold))
                 .foregroundStyle(Color(hexString: theme.foreground))
 
