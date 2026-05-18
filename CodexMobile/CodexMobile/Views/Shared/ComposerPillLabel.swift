@@ -24,7 +24,7 @@ struct ComposerPillLabel: View {
         title: String,
         iconSystemName: String,
         foregroundColor: Color = Color(.secondaryLabel),
-        titleFont: Font = AppFont.footnote(),
+        titleFont: Font = AppFont.subheadline(),
         titleWeight: Font.Weight = .regular,
         iconSize: CGFloat = 12,
         chevronSize: CGFloat = 7,

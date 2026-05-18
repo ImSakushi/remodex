@@ -49,7 +49,7 @@ struct TurnComposerSecondaryBar: View {
     // altrimenti l'asset central-shield-* (viewBox 24 con padding interno) risulta
     // visibilmente più piccolo delle icone "Local"/"main".
     private let accessControlIconSize: CGFloat = 16
-    private var branchTextFont: Font { AppFont.footnote() }
+    private var branchTextFont: Font { AppFont.subheadline() }
     private var runtimeLabelTitle: String {
         if !hasWorkingDirectory {
             return "Quick Chat"

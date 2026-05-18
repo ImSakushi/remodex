@@ -232,10 +232,10 @@ struct SidebarView<ConnectionEmptyStatePanel: View, ConnectionEmptyStateFooter: 
         }
     }
 
-    // Opens a draft composer first; the real thread is created only after the first send.
+    // Opens a rootless draft first; the real thread is created only after the first send.
     private func handleNewChatButtonTap() {
         prepareSidebarForChatNavigation()
-        onOpenNewChatDraft(.generalChat, defaultNewChatProjectPath)
+        onOpenNewChatDraft(.generalChat, nil)
     }
 
     // Starts a chat without a working directory (cwd == nil) directly from the sidebar row.
@@ -459,10 +459,6 @@ struct SidebarView<ConnectionEmptyStatePanel: View, ConnectionEmptyStateFooter: 
             from: codex.threads,
             projectlessRootPaths: projectlessChatRootPaths
         )
-    }
-
-    private var defaultNewChatProjectPath: String? {
-        newChatProjectChoices.first?.projectPath
     }
 
     private var sidebarGroupingScope: SidebarThreadGroupingScope {

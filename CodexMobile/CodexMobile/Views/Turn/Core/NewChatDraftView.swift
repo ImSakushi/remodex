@@ -187,7 +187,7 @@ struct NewChatDraftView: View {
     }
 
     // Source-specific prompt UI:
-    // - General Chat exposes the picker because the folder is still user-selectable.
+    // - General Chat stays rootless and intentionally avoids project selection.
     // - Folder/project button keeps the normal title because that folder is already implied.
     private var promptStack: some View {
         Group {
@@ -214,7 +214,6 @@ struct NewChatDraftView: View {
                 .foregroundStyle(.primary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 28)
-            folderPickerPill
             Text("Chats are End-to-end encrypted")
                 .font(AppFont.caption())
                 .foregroundStyle(.secondary)
@@ -247,14 +246,12 @@ struct NewChatDraftView: View {
         TurnChatToolbarTitleLabel(
             title: "New thread",
             subtitle: placeholderFolderName ?? trustedHostName,
-            onTap: { activeSheet = .projectPicker },
-            accessibilityHint: "Opens the project picker"
+            onTap: toolbarTitlePickerAction,
+            accessibilityHint: toolbarTitlePickerAction == nil ? nil : "Opens the project picker"
         )
     }
 
-    // Only Quick Chat / no-folder drafts are blocked. If the draft already has
-    // a selected project (including the default latest-used project from the
-    // general Chat button), expose the same Git state/actions as TurnView.
+    // Only folder-backed drafts expose Git state/actions; rootless general chat stays project-free.
     private var draftGitActionsButton: some View {
         TurnGitActionsToolbarButton(
             isEnabled: isDraftGitActionEnabled,
@@ -274,8 +271,7 @@ struct NewChatDraftView: View {
         .disabled(areDraftToolbarActionsDisabled)
     }
 
-    // Mirrors the regular chat ellipsis chrome. It is disabled only for the
-    // general Chat draft, where the folder can still change before first send.
+    // Mirrors the regular chat ellipsis chrome only when a folder-backed draft can act on a cwd.
     private var draftThreadActionsMenu: some View {
         TurnThreadActionsMenuButton(
             isLoading: false,
@@ -294,6 +290,11 @@ struct NewChatDraftView: View {
 
     private var areDraftToolbarActionsDisabled: Bool {
         !hasSelectedProject
+    }
+
+    private var toolbarTitlePickerAction: (() -> Void)? {
+        guard !isFromGeneralChat else { return nil }
+        return { activeSheet = .projectPicker }
     }
 
     private var isDraftGitActionEnabled: Bool {
@@ -416,51 +417,6 @@ struct NewChatDraftView: View {
             return nil
         }
         return selectedProjectPath.pathDisplayName
-    }
-
-    // Always reads the same way as the toolbar subtitle so the pill and the
-    // navigation block never disagree on what folder is currently bound.
-    private var folderPillLabel: String {
-        placeholderFolderName ?? "Quick Chat"
-    }
-
-    // Inline tap target: folder icon + name + chevron.up.chevron.down sized
-    // at body so it sits visually under the title3 prompt without competing
-    // with it for emphasis.
-    private var folderPickerPill: some View {
-        Button {
-            HapticFeedback.shared.triggerImpactFeedback(style: .light)
-            activeSheet = .projectPicker
-        } label: {
-            HStack(spacing: 8) {
-                pickerIcon
-                    .frame(width: 24, height: 24)
-
-                Text(folderPillLabel)
-                    .font(AppFont.title2(weight: .regular))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(AppFont.caption())
-            }
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 12)
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Select folder")
-        .accessibilityHint("Opens the project picker")
-        .accessibilityValue(folderPillLabel)
-    }
-
-    // Uses the Remodex custom asset set directly: chat bubbles for Quick Chat,
-    // folder glyph for project-backed drafts.
-    private var pickerIcon: some View {
-        Image(placeholderFolderName == nil ? "central-chat-bubbles" : "central-folder-2")
-            .renderingMode(.template)
-            .resizable()
-            .scaledToFit()
     }
 
     private var trustedHostName: String? {
@@ -593,6 +549,12 @@ struct NewChatDraftView: View {
 
     private func initializeProjectSelectionIfNeeded() {
         guard !hasInitializedProjectSelection else { return }
+
+        guard !isFromGeneralChat else {
+            selectedProjectPath = nil
+            hasInitializedProjectSelection = true
+            return
+        }
 
         selectedProjectPath = CodexThreadStartProjectBinding.normalizedProjectPath(route.preferredProjectPath)
             ?? projectChoices.first?.projectPath
