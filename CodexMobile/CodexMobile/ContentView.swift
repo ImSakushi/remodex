@@ -535,6 +535,7 @@ struct ContentView: View {
             isSearchActive: $isSearchActive,
             showsInlineCloseButton: showsInlineCloseButton,
             isVisible: isVisible,
+            connectionPhase: homeConnectionPhase,
             onClose: onClose,
             onOpenSettings: {
                 openSettingsFromSidebar()
@@ -1090,7 +1091,7 @@ struct ContentView: View {
                 codex.lastErrorMessage = codex.userFacingTurnErrorMessageForFooter(from: error)
             }
 
-            codex.requestImmediateActiveThreadSync(threadId: thread.id)
+            codex.requestImmediateActiveThreadSync(threadId: thread.id, forceHistoryRefresh: true)
         }
     }
 

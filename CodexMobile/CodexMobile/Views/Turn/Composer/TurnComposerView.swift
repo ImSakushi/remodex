@@ -2,7 +2,7 @@
 // Purpose: Renders the turn composer input, queued-draft actions, attachments, and send/stop controls.
 // Layer: View Component (orchestrator)
 // Exports: TurnComposerView, TurnComposerInputChangeHandler
-// Depends on: SwiftUI, AdaptiveGlassModifier, ComposerAttachmentsPreview, FileAutocompletePanel, SkillAutocompletePanel, SlashCommandAutocompletePanel, ComposerBottomBar, QueuedDraftsPanel, FileMentionChip, TurnComposerInputTextView, TurnComposerSecondaryBar
+// Depends on: SwiftUI, AdaptiveGlassModifier, ComposerAttachmentsPreview, FileAutocompletePanel, SkillAutocompletePanel, SlashCommandAutocompletePanel, ComposerBottomBar, QueuedDraftsPanel, TurnMentionChips, TurnComposerInputTextView, TurnComposerSecondaryBar
 
 import SwiftUI
 import UIKit
@@ -119,17 +119,16 @@ struct TurnComposerView: View {
     var body: some View {
         AdaptiveGlassContainer(spacing: 6) {
             VStack(spacing: 6) {
-                TurnComposerQueuedDraftsSection(
-                    drafts: accessoryState.queuedDrafts,
-                    canSteerDrafts: accessoryState.canSteerQueuedDrafts,
-                    canRestoreDrafts: accessoryState.canRestoreQueuedDrafts,
-                    steeringDraftID: accessoryState.steeringDraftID,
-                    onRestoreQueuedDraft: onRestoreQueuedDraft,
-                    onSteerQueuedDraft: onSteerQueuedDraft,
-                    onRemoveQueuedDraft: onRemoveQueuedDraft
-                )
+                if accessoryState.showsVoiceRecordingCapsule {
+                    VoiceRecordingCapsule(
+                        audioLevels: accessoryState.voiceAudioLevels,
+                        duration: accessoryState.voiceRecordingDuration,
+                        onCancel: onCancelVoiceRecording
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                }
 
-                if showsSecondaryBar {
+                if showsSecondaryBar && hasWorkingDirectory && !accessoryState.showsVoiceRecordingCapsule {
                     TurnComposerSecondaryBar(
                         isInputFocused: isInputFocused.wrappedValue,
                         isEmptyThread: isEmptyThread,
@@ -164,6 +163,16 @@ struct TurnComposerView: View {
                 }
 
                 VStack(spacing: 0) {
+                    TurnComposerQueuedDraftsSection(
+                        drafts: accessoryState.queuedDrafts,
+                        canSteerDrafts: accessoryState.canSteerQueuedDrafts,
+                        canRestoreDrafts: accessoryState.canRestoreQueuedDrafts,
+                        steeringDraftID: accessoryState.steeringDraftID,
+                        onRestoreQueuedDraft: onRestoreQueuedDraft,
+                        onSteerQueuedDraft: onSteerQueuedDraft,
+                        onRemoveQueuedDraft: onRemoveQueuedDraft
+                    )
+
                     TurnComposerAccessorySection(
                         state: accessoryState,
                         onRemoveAttachment: onRemoveAttachment,
@@ -171,7 +180,8 @@ struct TurnComposerView: View {
                         onRemoveMentionedSkill: onRemoveMentionedSkill,
                         onRemoveMentionedPlugin: onRemoveMentionedPlugin,
                         onRemoveComposerReviewSelection: onRemoveComposerReviewSelection,
-                        onRemoveComposerSubagentsSelection: onRemoveComposerSubagentsSelection
+                        onRemoveComposerSubagentsSelection: onRemoveComposerSubagentsSelection,
+                        onRemoveComposerPlanModeSelection: { onSetPlanModeArmed(false) }
                     )
 
                     ZStack(alignment: .topLeading) {
@@ -214,6 +224,7 @@ struct TurnComposerView: View {
                     }
 
                     ComposerBottomBar(
+                        hasWorkingDirectory: hasWorkingDirectory,
                         orderedModelOptions: orderedModelOptions,
                         selectedModelID: selectedModelID,
                         selectedModelTitle: selectedModelTitle,
@@ -232,6 +243,14 @@ struct TurnComposerView: View {
                         isThreadRunning: isThreadRunning,
                         showsSendButton: showsSendButton,
                         voiceButtonPresentation: voiceButtonPresentation,
+                        selectedAccessMode: selectedAccessMode,
+                        contextWindowUsage: contextWindowUsage,
+                        rateLimitBuckets: rateLimitBuckets,
+                        isLoadingRateLimits: isLoadingRateLimits,
+                        rateLimitsErrorMessage: rateLimitsErrorMessage,
+                        shouldAutoRefreshUsageStatus: shouldAutoRefreshUsageStatus,
+                        onRefreshUsageStatus: onRefreshUsageStatus,
+                        onSelectAccessMode: onSelectAccessMode,
                         onTapAddImage: onTapAddImage,
                         onTapTakePhoto: onTapTakePhoto,
                         onTapVoice: onTapVoice,
@@ -247,29 +266,18 @@ struct TurnComposerView: View {
                     Color.clear
                         .frame(maxWidth: .infinity, maxHeight: 0, alignment: .topLeading)
                         .overlay(alignment: .bottomLeading) {
-                            // Keep the floating overlay stretched to the composer width so the
-                            // recording capsule can expand all the way toward the trailing controls.
-                            VStack(alignment: .leading, spacing: 6) {
-                                if accessoryState.showsVoiceRecordingCapsule {
-                                    VoiceRecordingCapsule(
-                                        audioLevels: accessoryState.voiceAudioLevels,
-                                        duration: accessoryState.voiceRecordingDuration,
-                                        onCancel: onCancelVoiceRecording
-                                    )
-                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
-                                }
-
-                                TurnComposerAutocompletePanels(
-                                    state: autocompleteState,
-                                    onSelectFileAutocomplete: onSelectFileAutocomplete,
-                                    onSelectSkillAutocomplete: onSelectSkillAutocomplete,
-                                    onSelectPluginAutocomplete: onSelectPluginAutocomplete,
-                                    onSelectSlashCommand: onSelectSlashCommand,
-                                    onSelectCodeReviewTarget: onSelectCodeReviewTarget,
-                                    onSelectForkDestination: onSelectForkDestination,
-                                    onCloseSlashCommandPanel: onCloseSlashCommandPanel
-                                )
-                            }
+                            // Keep autocomplete stretched to the composer width so large panels
+                            // align with the glass input instead of the typed token.
+                            TurnComposerAutocompletePanels(
+                                state: autocompleteState,
+                                onSelectFileAutocomplete: onSelectFileAutocomplete,
+                                onSelectSkillAutocomplete: onSelectSkillAutocomplete,
+                                onSelectPluginAutocomplete: onSelectPluginAutocomplete,
+                                onSelectSlashCommand: onSelectSlashCommand,
+                                onSelectCodeReviewTarget: onSelectCodeReviewTarget,
+                                onSelectForkDestination: onSelectForkDestination,
+                                onCloseSlashCommandPanel: onCloseSlashCommandPanel
+                            )
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .offset(y: -8)
@@ -284,7 +292,7 @@ struct TurnComposerView: View {
     }
 
     private var placeholderText: String {
-        isEmptyThread ? "Ask anything... @plugins, $skills, /commands" : "Ask for follow-up changes"
+        isEmptyThread ? "Ask Remodex anything..." : "Ask for follow-up changes"
     }
 
 }
@@ -383,16 +391,9 @@ private struct TurnComposerQueuedDraftsSection: View {
                     onRemove: onRemoveQueuedDraft
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding([.horizontal, .bottom], 4)
-                .adaptiveGlass(.regular, in: UnevenRoundedRectangle(
-                    topLeadingRadius: 28,
-                    bottomLeadingRadius: 0,
-                    bottomTrailingRadius: 0,
-                    topTrailingRadius: 28,
-                    style: .continuous
-                ))
-                .padding(.bottom, -10)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 6)
+                .padding(.top, 7)
+                .padding(.bottom, 3)
             }
         }
     }
@@ -406,6 +407,7 @@ private struct TurnComposerAccessorySection: View {
     let onRemoveMentionedPlugin: (String) -> Void
     let onRemoveComposerReviewSelection: () -> Void
     let onRemoveComposerSubagentsSelection: () -> Void
+    let onRemoveComposerPlanModeSelection: () -> Void
 
     var body: some View {
         Group {
@@ -419,87 +421,15 @@ private struct TurnComposerAccessorySection: View {
                 .padding(.bottom, 8)
             }
 
-            if state.showsMentionedFiles {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(state.composerMentionedFiles) { file in
-                            FileMentionChip(fileName: file.fileName) {
-                                onRemoveMentionedFile(file.id)
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-            }
-
-            if state.showsMentionedSkills {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(state.composerMentionedSkills) { skill in
-                            SkillMentionChip(skillName: skill.name) {
-                                onRemoveMentionedSkill(skill.id)
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-            }
-
-            if state.showsMentionedPlugins {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ForEach(state.composerMentionedPlugins) { plugin in
-                            PluginMentionChip(pluginName: plugin.displayName ?? plugin.name) {
-                                onRemoveMentionedPlugin(plugin.id)
-                            }
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-            }
-
-            if state.showsSubagentsSelection {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ComposerActionChip(
-                            title: "Subagents",
-                            symbolName: "point.3.connected.trianglepath.dotted",
-                            tintColor: .teal,
-                            removeAccessibilityLabel: "Remove subagents"
-                        ) {
-                            onRemoveComposerSubagentsSelection()
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-            }
-
-            if let reviewTarget = state.reviewTarget {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        ComposerActionChip(
-                            title: "Code Review: \(reviewTarget.title)",
-                            symbolName: "checklist",
-                            tintColor: .teal,
-                            removeAccessibilityLabel: "Remove code review"
-                        ) {
-                            onRemoveComposerReviewSelection()
-                        }
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-            }
-
+            TurnComposerMentionChipSections(
+                state: state,
+                onRemoveMentionedFile: onRemoveMentionedFile,
+                onRemoveMentionedSkill: onRemoveMentionedSkill,
+                onRemoveMentionedPlugin: onRemoveMentionedPlugin,
+                onRemoveComposerReviewSelection: onRemoveComposerReviewSelection,
+                onRemoveComposerSubagentsSelection: onRemoveComposerSubagentsSelection,
+                onRemoveComposerPlanModeSelection: onRemoveComposerPlanModeSelection
+            )
         }
     }
 }
@@ -691,6 +621,7 @@ private struct ComposerPreviewContent: View {
                 composerMentionedPlugins: [],
                 composerReviewSelection: nil,
                 isSubagentsSelectionArmed: isSubagentsSelectionArmed,
+                isPlanModeArmed: isPlanModeArmed,
                 isVoiceRecording: false,
                 voiceAudioLevels: [],
                 voiceRecordingDuration: 0

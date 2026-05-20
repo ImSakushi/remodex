@@ -170,7 +170,7 @@ extension CodexService {
         workspaceCheckpointCopyTaskByTurnID.removeAll()
         supportsServiceTier = true
         hasPresentedServiceTierBridgeUpdatePrompt = false
-        supportsBridgeVoiceAuth = true
+        supportsBridgeVoiceTranscription = true
         supportsThreadFork = true
         supportsTurnPagination = true
         hasPresentedThreadForkBridgeUpdatePrompt = false
@@ -627,7 +627,7 @@ extension CodexService {
         workspaceCheckpointCopyTaskByTurnID.removeAll()
         supportsServiceTier = true
         hasPresentedServiceTierBridgeUpdatePrompt = false
-        supportsBridgeVoiceAuth = true
+        supportsBridgeVoiceTranscription = true
         supportsThreadFork = true
         supportsTurnPagination = true
         hasPresentedThreadForkBridgeUpdatePrompt = false

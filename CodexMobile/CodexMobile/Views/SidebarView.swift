@@ -6,8 +6,9 @@
 //          handoff used by the chat's system navigation bar. On iOS 18 it
 //          falls back to `safeAreaInset(edge:.top)` with an opaque header
 //          fill so nothing regresses. Body: native scroll with search +
-//          project / chat list, swapped for a centered connect/reconnect/scan-QR
-//          card when the relay is offline and no cached chats exist. The
+//          project / chat list, swapped for search + a status chip + a centered
+//          connect/reconnect/scan-QR card when the relay is offline and no
+//          cached chats exist. The
 //          Projects/Chats scope picker routes rootless chats separately from
 //          project groups. Bottom: SidebarBottomActionBar with the primary Chat
 //          FAB (glass on iOS 26, accent pill on iOS 18).
@@ -15,7 +16,8 @@
 // Exports: SidebarView
 // Depends on: CodexService, SidebarHeaderView, SidebarThreadListView,
 //             SidebarBottomActionBar, SidebarSearchField,
-//             SidebarConnectionEmptyStatePanel, SidebarConnectionEmptyStateFooter
+//             SidebarConnectionEmptyStatePanel, SidebarConnectionStatusBadge,
+//             SidebarConnectionEmptyStateFooter
 
 import SwiftUI
 
@@ -26,6 +28,7 @@ struct SidebarView<ConnectionEmptyStatePanel: View, ConnectionEmptyStateFooter: 
     @Binding var isSearchActive: Bool
     var showsInlineCloseButton: Bool = false
     var isVisible: Bool = true
+    let connectionPhase: CodexConnectionPhase
 
     let onClose: () -> Void
     let onOpenSettings: () -> Void
@@ -233,8 +236,17 @@ struct SidebarView<ConnectionEmptyStatePanel: View, ConnectionEmptyStateFooter: 
         }
     }
 
-    // Opens a rootless draft first; the real thread is created only after the first send.
+    // Opens a draft composer first; the real thread is created only after the first send.
+    // Seeds the draft with the latest used project so the pill under the prompt has a sensible
+    // default the user can still change via the picker.
     private func handleNewChatButtonTap() {
+        prepareSidebarForChatNavigation()
+        onOpenNewChatDraft(.generalChat, defaultNewChatProjectPath)
+    }
+
+    // Bottom Chat pill is the fast rootless draft entry: no project preselection,
+    // no picker pill, and the real Codex-style cwd is minted on first send.
+    private func handleRootlessChatDraftTap() {
         prepareSidebarForChatNavigation()
         onOpenNewChatDraft(.generalChat, nil)
     }
@@ -460,6 +472,10 @@ struct SidebarView<ConnectionEmptyStatePanel: View, ConnectionEmptyStateFooter: 
         )
     }
 
+    private var defaultNewChatProjectPath: String? {
+        newChatProjectChoices.first?.projectPath
+    }
+
     // Keeps the chooser in sync with the same project buckets shown in the sidebar.
     private var newChatProjectChoices: [SidebarProjectChoice] {
         SidebarThreadGrouping.makeProjectChoices(
@@ -568,15 +584,20 @@ struct SidebarView<ConnectionEmptyStatePanel: View, ConnectionEmptyStateFooter: 
         }
     }
 
-    // Keeps the search field at the top so the user can return to a filtered
-    // list as soon as chats sync, while centering the connect panel between
-    // the header and the safe-area footer.
+    // Keeps search + connection status in the same top rhythm as the normal
+    // Projects/Chats chips, while centering the connect panel between the
+    // header and the safe-area footer.
     private var connectionEmptyStateLayout: some View {
         VStack(spacing: 0) {
             SidebarSearchField(text: $searchText, isActive: $isSearchActive)
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
                 .padding(.bottom, 12)
+
+            SidebarConnectionStatusBadge(connectionPhase: connectionPhase)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
 
             Spacer(minLength: 0)
 
@@ -690,7 +711,7 @@ struct SidebarView<ConnectionEmptyStatePanel: View, ConnectionEmptyStateFooter: 
         SidebarBottomActionBar(
             isChatEnabled: canCreateThread,
             isCreatingThread: isCreatingThread,
-            onTapChat: handleNewChatButtonTap,
+            onTapChat: handleRootlessChatDraftTap,
             onTapTerminal: openTerminal
         )
     }
