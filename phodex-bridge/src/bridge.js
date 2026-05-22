@@ -69,6 +69,11 @@ const {
   readThreadTurnsListPageFromSessionJsonl,
 } = require("./session-jsonl-history");
 const { buildApplyPatchFileChangeItem } = require("./apply-patch-changes");
+const {
+  createRuntimeProviderRouter,
+  stripRuntimeProviderFieldsForCodex,
+} = require("./runtime-provider-router");
+const { createProjectRegistry } = require("./project-registry");
 
 const execFileAsync = promisify(execFile);
 const RELAY_WATCHDOG_PING_INTERVAL_MS = 10_000;
@@ -243,6 +248,14 @@ function startBridge({
     appPath: config.codexAppPath,
     logPrefix: "[remodex]",
   });
+  const projectRegistry = createProjectRegistry();
+  const runtimeProviderRouter = createRuntimeProviderRouter({
+    sendApplicationResponse,
+    sendCodexRequest,
+    sendRuntimeMessage: (message) => sendRuntimeApplicationMessage("opencode", message),
+    projectRegistry,
+    logPrefix: "[remodex]",
+  });
   const voiceHandler = createVoiceHandler({
     sendCodexRequest,
     logPrefix: "[remodex]",
@@ -320,6 +333,7 @@ function startBridge({
     clearReconnectTimer();
     clearRelayWatchdog();
     bridgeStatusPublisher.stopHeartbeat();
+    runtimeProviderRouter.shutdown();
     stopContextUsageWatcher();
     rolloutLiveMirror?.stopAll();
     desktopIpcActionFollower?.stopAll();
@@ -560,7 +574,7 @@ function startBridge({
     if (handleWorkspaceRequest(rawMessage, sendApplicationResponse)) {
       return;
     }
-    if (handleProjectRequest(rawMessage, sendApplicationResponse)) {
+    if (handleProjectRequest(rawMessage, sendApplicationResponse, { projectRegistry })) {
       return;
     }
     if (handlePetRequest(rawMessage, sendApplicationResponse)) {
@@ -589,17 +603,34 @@ function startBridge({
     if (desktopIpcActionFollower?.observeInbound(rawMessage)) {
       return;
     }
+    if (runtimeProviderRouter.handleApplicationMessage(rawMessage)) {
+      return;
+    }
     if (handleBridgeManagedThreadTurnsListRequest(rawMessage, sendApplicationResponse)) {
       return;
     }
-    const codexRequest = disableUnsupportedReasoningSummaryForTurnStart(rawMessage);
+    const codexRequest = stripRuntimeProviderFieldsForCodex(
+      disableUnsupportedReasoningSummaryForTurnStart(rawMessage)
+    );
     rememberForwardedRequestMethod(rawMessage);
     rememberThreadFromMessage("phone", codexRequest);
+    rememberKnownProjectFromRequest("codex-request", codexRequest);
     codex.send(codexRequest);
   }
 
   // Encrypts bridge-generated responses instead of letting the relay see plaintext.
   function sendApplicationResponse(rawMessage) {
+    secureTransport.queueOutboundApplicationMessage(
+      sanitizeRelayBoundCodexMessage(rawMessage),
+      sendRelayWireMessage
+    );
+  }
+
+  // Provider output still feeds the same desktop refresh, push, and secure relay side effects.
+  function sendRuntimeApplicationMessage(provider, rawMessage) {
+    desktopRefresher.handleOutbound(rawMessage);
+    pushNotificationTracker.handleOutbound(rawMessage);
+    rememberThreadFromMessage(provider, rawMessage);
     secureTransport.queueOutboundApplicationMessage(
       sanitizeRelayBoundCodexMessage(rawMessage),
       sendRelayWireMessage
@@ -1022,6 +1053,33 @@ function startBridge({
     rememberActiveThread(context.threadId, source);
     if (shouldStartContextUsageWatcher(context)) {
       ensureContextUsageWatcher(context);
+    }
+  }
+
+  // Captures explicit cwd selections before Codex creates the first thread, so
+  // provider-neutral pickers do not depend on a later provider-specific message.
+  function rememberKnownProjectFromRequest(source, rawMessage) {
+    const parsed = safeParseJSON(rawMessage);
+    const method = typeof parsed?.method === "string" ? parsed.method.trim() : "";
+    if (method !== "thread/start" && method !== "turn/start") {
+      return;
+    }
+
+    const params = parsed?.params || {};
+    const cwd = normalizeNonEmptyString(
+      params.cwd || params.current_working_directory || params.working_directory
+    );
+    if (!cwd) {
+      return;
+    }
+
+    try {
+      projectRegistry.rememberProjectPath(cwd, {
+        source,
+        provider: "codex",
+      });
+    } catch {
+      // Registry persistence is best-effort; thread creation must keep flowing.
     }
   }
 

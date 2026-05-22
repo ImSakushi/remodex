@@ -67,7 +67,7 @@ final class CodexThreadRuntimeOverrideTests: XCTestCase {
 
         service.setSelectedModelId(nil)
 
-        XCTAssertEqual(service.selectedModelId, "gpt-5.5")
+        XCTAssertEqual(service.selectedModelId, "codex:gpt-5.5")
         XCTAssertEqual(service.selectedReasoningEffort, "medium")
         XCTAssertEqual(service.runtimeModelIdentifierForTurn(), "gpt-5.5")
         XCTAssertEqual(service.selectedReasoningEffortForSelectedModel(), "medium")
@@ -150,14 +150,58 @@ final class CodexThreadRuntimeOverrideTests: XCTestCase {
         firstService.normalizeRuntimeSelectionsAfterModelsUpdate()
 
         XCTAssertTrue(firstService.hasPersistedSelectedModelId)
-        XCTAssertEqual(firstService.selectedModelId, "gpt-5.5")
-        XCTAssertEqual(defaults.string(forKey: CodexService.selectedModelIdDefaultsKey), "gpt-5.5")
+        XCTAssertEqual(firstService.selectedModelId, "codex:gpt-5.5")
+        XCTAssertEqual(defaults.string(forKey: CodexService.selectedModelIdDefaultsKey), "codex:gpt-5.5")
 
         let secondService = CodexService(defaults: defaults)
         Self.retainedServices.append(secondService)
 
         XCTAssertTrue(secondService.hasPersistedSelectedModelId)
-        XCTAssertEqual(secondService.selectedModelId, "gpt-5.5")
+        XCTAssertEqual(secondService.selectedModelId, "codex:gpt-5.5")
+    }
+
+    func testProviderThreadKeepsUnresolvedRuntimeIdentity() {
+        let service = makeService()
+        service.availableModels = [makeGPT55Model()]
+        service.setSelectedModelId("codex:gpt-5.5")
+        service.upsertThread(CodexThread(
+            id: "thread-opencode",
+            cwd: "/tmp/project",
+            model: "opencode/gpt-5.5",
+            modelProvider: "opencode"
+        ))
+
+        XCTAssertNil(service.selectedModelOption(threadId: "thread-opencode"))
+        XCTAssertEqual(
+            service.visibleSelectedModelIDForComposer(threadId: "thread-opencode"),
+            "opencode:opencode/gpt-5.5"
+        )
+        XCTAssertEqual(
+            service.runtimeModelIdentifierForTurn(threadId: "thread-opencode"),
+            "opencode/gpt-5.5"
+        )
+        XCTAssertEqual(service.runtimeModelProviderForTurn(threadId: "thread-opencode"), "opencode")
+        XCTAssertNil(service.selectedReasoningEffortForSelectedModel(threadId: "thread-opencode"))
+    }
+
+    func testLegacyCodexModelProviderMetadataStillFallsBackToCodexModel() {
+        let service = makeService()
+        service.availableModels = [makeModel()]
+        service.setSelectedModelId("codex:gpt-5.4")
+        service.upsertThread(CodexThread(
+            id: "thread-legacy-provider",
+            cwd: "/tmp/project",
+            model: "gpt-5.4",
+            modelProvider: "openai"
+        ))
+
+        XCTAssertEqual(
+            service.selectedModelOption(threadId: "thread-legacy-provider")?.selectionKey,
+            "codex:gpt-5.4"
+        )
+        XCTAssertEqual(service.runtimeModelIdentifierForTurn(threadId: "thread-legacy-provider"), "gpt-5.4")
+        XCTAssertEqual(service.runtimeModelProviderForTurn(threadId: "thread-legacy-provider"), "codex")
+        XCTAssertEqual(service.selectedReasoningEffortForSelectedModel(threadId: "thread-legacy-provider"), "medium")
     }
 
     func testContinuationInheritsThreadRuntimeOverrides() {

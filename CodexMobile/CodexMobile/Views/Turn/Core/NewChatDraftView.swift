@@ -52,6 +52,7 @@ struct NewChatDraftView: View {
     @State private var isInputFocused = false
     @State private var selectedProjectPath: String?
     @State private var projectlessChatRootPaths: [String] = []
+    @State private var knownProjects: [CodexKnownProject] = []
     @State private var activeSheet: NewChatDraftSheet?
     @State private var hasInitializedProjectSelection = false
     @State private var isLoadingRepositoryDiff = false
@@ -133,6 +134,7 @@ struct NewChatDraftView: View {
             initializeProjectSelectionIfNeeded()
             refreshDraftGitStateIfNeeded()
             await refreshProjectlessChatRoots()
+            await refreshKnownProjects()
             refreshDraftGitStateIfNeeded()
         }
         .onChange(of: projectChoices) { _, _ in
@@ -145,6 +147,10 @@ struct NewChatDraftView: View {
 
             if voiceRecoveryReason == .reconnectRequired {
                 clearVoiceRecovery()
+            }
+            Task { @MainActor in
+                await refreshProjectlessChatRoots()
+                await refreshKnownProjects()
             }
             guard !wasConnected, isConnected else { return }
             refreshDraftGitStateIfNeeded()
@@ -668,6 +674,7 @@ struct NewChatDraftView: View {
     private var projectChoices: [SidebarProjectChoice] {
         SidebarThreadGrouping.makeProjectChoices(
             from: codex.threads,
+            knownProjects: knownProjects,
             projectlessRootPaths: projectlessChatRootPaths
         )
     }
@@ -678,16 +685,18 @@ struct NewChatDraftView: View {
 
     private var reasoningDisplayOptions: [TurnComposerReasoningDisplayOption] {
         TurnComposerMetaMapper.reasoningDisplayOptions(
-            from: codex.supportedReasoningEffortsForSelectedModel().map(\.reasoningEffort)
+            from: codex.supportedReasoningEffortsForSelectedModel(threadId: route.id).map(\.reasoningEffort)
         )
     }
 
     private var selectedModelTitle: String {
-        if let selectedModel = codex.selectedModelOption() {
+        if let selectedModel = codex.selectedModelOption(threadId: route.id) {
             return TurnComposerMetaMapper.modelTitle(for: selectedModel)
         }
 
-        return TurnComposerMetaMapper.modelTitle(forIdentifier: codex.selectedModelId)
+        return TurnComposerMetaMapper.modelTitle(
+            forIdentifier: codex.visibleSelectedModelIDForComposer(threadId: route.id) ?? codex.selectedModelId
+        )
     }
 
     // Mirrors the regular TurnView mic state so empty drafts can record before a runtime thread exists.
@@ -760,6 +769,26 @@ struct NewChatDraftView: View {
             initializeProjectSelectionIfNeeded()
         } catch {
             // Project grouping still has built-in fallbacks for older local bridges.
+        }
+    }
+
+    private func refreshKnownProjects() async {
+        guard codex.isConnected else { return }
+
+        do {
+            let projects = try await codex.fetchKnownProjects()
+            guard projects != knownProjects else { return }
+            knownProjects = projects
+            initializeProjectSelectionIfNeeded()
+        } catch {
+            // Older bridges keep the picker thread-derived until the registry RPC exists.
+        }
+    }
+
+    private func rememberKnownProjectSelection(_ projectPath: String) {
+        Task { @MainActor in
+            _ = try? await codex.rememberKnownProject(path: projectPath)
+            await refreshKnownProjects()
         }
     }
 
@@ -1037,6 +1066,7 @@ struct NewChatDraftView: View {
         case .localFolderBrowser:
             SidebarLocalFolderBrowserSheet { projectPath in
                 selectedProjectPath = projectPath
+                rememberKnownProjectSelection(projectPath)
                 activeSheet = nil
             }
         }
