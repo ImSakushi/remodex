@@ -2,9 +2,11 @@
 // Purpose: AVFoundation pairing screen dedicated to camera-based QR scans.
 // Layer: View
 // Exports: QRScannerView
-// Depends on: SwiftUI, AVFoundation
+// Depends on: SwiftUI, AVFoundation, CoreImage, PhotosUI
 
 import AVFoundation
+import CoreImage
+import PhotosUI
 import SwiftUI
 import UIKit
 
@@ -17,6 +19,8 @@ struct QRScannerView: View {
     @State private var didCopyBridgeUpdateCommand = false
     @State private var hasCameraPermission = false
     @State private var isCheckingPermission = true
+    @State private var isImportingQRCodePhoto = false
+    @State private var qrPhotoPickerItem: PhotosPickerItem?
 
     init(
         initialBridgeUpdatePrompt: CodexBridgeUpdatePrompt? = nil,
@@ -65,6 +69,11 @@ struct QRScannerView: View {
         }
         .task {
             await checkCameraPermission()
+        }
+        .onChange(of: qrPhotoPickerItem) { _, item in
+            Task {
+                await importQRCodePhoto(item)
+            }
         }
         .alert("Pairing Error", isPresented: Binding(
             get: { scannerError != nil },
@@ -207,6 +216,8 @@ struct QRScannerView: View {
                 .font(AppFont.subheadline(weight: .medium))
                 .foregroundStyle(.white)
 
+            importQRCodePhotoPicker
+
             Spacer()
         }
     }
@@ -233,7 +244,31 @@ struct QRScannerView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
+
+            importQRCodePhotoPicker
         }
+    }
+
+    private var importQRCodePhotoPicker: some View {
+        PhotosPicker(
+            selection: $qrPhotoPickerItem,
+            matching: .images,
+            preferredItemEncoding: .automatic
+        ) {
+            Label(isImportingQRCodePhoto ? "Importing..." : "Import QR Photo", systemImage: "photo")
+                .font(AppFont.subheadline(weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 12)
+                .background(Color.white.opacity(0.14), in: Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(Color.white.opacity(0.18), lineWidth: 1)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(isImportingQRCodePhoto)
+        .accessibilityLabel("Import QR code photo")
     }
 
     // Keeps permission-prompt teardown on the main actor so backing out mid-prompt
@@ -274,6 +309,58 @@ struct QRScannerView: View {
             bridgeUpdatePrompt = prompt
             resetScanLock()
         }
+    }
+
+    @MainActor
+    private func importQRCodePhoto(_ item: PhotosPickerItem?) async {
+        guard let item else {
+            return
+        }
+
+        isImportingQRCodePhoto = true
+        defer {
+            isImportingQRCodePhoto = false
+            qrPhotoPickerItem = nil
+        }
+
+        let imageData: Data
+        do {
+            guard let loadedData = try await item.loadTransferable(type: Data.self) else {
+                scannerError = "Could not read that photo. Try another image from your library."
+                return
+            }
+            imageData = loadedData
+        } catch {
+            scannerError = "Could not import that photo. Try another image from your library."
+            return
+        }
+
+        guard let code = QRCodeImageDecoder.decode(from: imageData) else {
+            scannerError = "No QR code found in that photo. Try a clearer screenshot or image."
+            return
+        }
+
+        HapticFeedback.shared.triggerImpactFeedback(style: .heavy)
+        handleScanResult(code) {}
+    }
+}
+
+private enum QRCodeImageDecoder {
+    static func decode(from imageData: Data) -> String? {
+        guard let image = CIImage(data: imageData) ?? UIImage(data: imageData).flatMap(CIImage.init(image:)) else {
+            return nil
+        }
+
+        let detector = CIDetector(
+            ofType: CIDetectorTypeQRCode,
+            context: nil,
+            options: [CIDetectorAccuracy: CIDetectorAccuracyHigh]
+        )
+
+        return detector?
+            .features(in: image)
+            .compactMap { ($0 as? CIQRCodeFeature)?.messageString?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
     }
 }
 
