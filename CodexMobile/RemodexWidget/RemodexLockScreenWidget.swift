@@ -119,6 +119,7 @@ struct RemodexDisplayIslandLiveActivity: Widget {
                         title: "Running",
                         tint: .green
                     )
+                    .padding(.leading, 8)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     RemodexDisplayIslandCountView(
@@ -126,6 +127,7 @@ struct RemodexDisplayIslandLiveActivity: Widget {
                         title: "Review",
                         tint: context.state.failedConversations.isEmpty ? .cyan : .orange
                     )
+                    .padding(.trailing, 8)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     RemodexDisplayIslandExpandedList(state: context.state)

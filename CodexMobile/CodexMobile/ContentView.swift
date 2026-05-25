@@ -149,6 +149,10 @@ struct ContentView: View {
                     to: thread?.id
                 )
                 codex.activeThreadId = thread?.id
+                if let thread {
+                    clearDisplayIslandOutcome(for: thread.id)
+                    syncDisplayIsland()
+                }
                 if thread != nil {
                     suppressAutomaticThreadSelection = false
                 }
@@ -218,6 +222,9 @@ struct ContentView: View {
                 syncDisplayIsland()
             }
             .onChange(of: codex.runningThreadIDs) { _, _ in
+                syncDisplayIsland()
+            }
+            .onChange(of: displayIslandTimelineFingerprint) { _, _ in
                 syncDisplayIsland()
             }
             .onChange(of: codex.activeTurnIdByThread) { _, _ in
@@ -1141,6 +1148,8 @@ struct ContentView: View {
         selectedThread = thread
         codex.activeThreadId = thread.id
         codex.markThreadAsViewed(thread.id)
+        clearDisplayIslandOutcome(for: thread.id)
+        syncDisplayIsland()
         if shouldPresentSidebarAsNavigation {
             navigationPath = [.thread(id: thread.id)]
         }
@@ -1194,6 +1203,8 @@ struct ContentView: View {
         selectedThread = thread
         codex.activeThreadId = thread.id
         codex.markThreadAsViewed(thread.id)
+        clearDisplayIslandOutcome(for: thread.id)
+        syncDisplayIsland()
 
         if shouldPresentSidebarAsNavigation {
             Task { @MainActor in
@@ -1952,6 +1963,11 @@ struct ContentView: View {
         }
     }
 
+    private func clearDisplayIslandOutcome(for threadId: String) {
+        displayIslandCompletedBanners.removeAll { $0.threadId == threadId }
+        displayIslandFailedBanners.removeAll { $0.threadId == threadId }
+    }
+
     private func syncDisplayIsland() {
         reconcileDisplayIslandCompletions()
         let snapshot = displayIslandSnapshot()
@@ -1993,7 +2009,7 @@ struct ContentView: View {
     private func displayIslandSnapshot() -> RemodexDisplayIslandSnapshot {
         let runningIDs = displayIslandCurrentRunningThreadIDs()
         let runningConversations = runningIDs
-            .compactMap { displayIslandConversation(threadId: $0, state: "Running") }
+            .compactMap { displayIslandConversation(threadId: $0, state: displayIslandRunningState(for: $0)) }
             .sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
 
         let completedConversations = displayIslandCompletedBanners.compactMap { banner in
@@ -2012,6 +2028,28 @@ struct ContentView: View {
 
     private func displayIslandCurrentRunningThreadIDs() -> Set<String> {
         codex.runningThreadIDs.union(Set(codex.activeTurnIdByThread.keys))
+    }
+
+    private var displayIslandTimelineFingerprint: String {
+        displayIslandCurrentRunningThreadIDs()
+            .sorted()
+            .map { threadId in
+                let snapshot = codex.timelineState(for: threadId).renderSnapshot
+                return "\(threadId):\(snapshot.timelineChangeToken):\(displayIslandRunningState(for: threadId))"
+            }
+            .joined(separator: "|")
+    }
+
+    private func displayIslandRunningState(for threadId: String) -> String {
+        let messages = codex.timelineState(for: threadId).renderSnapshot.messages
+        let isFinalAnswerStreaming = messages.contains { message in
+            message.role == .assistant
+                && message.kind == .chat
+                && message.isStreaming
+                && message.assistantPhase == "final_answer"
+                && !message.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return isFinalAnswerStreaming ? "Finishing" : "Running"
     }
 
     private func displayIslandConversation(
